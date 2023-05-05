@@ -10,9 +10,9 @@ Database implemented in pure Python
     from database.DataBase import main
     
     if __name__ == '__main__':
-    for x in range(1):
         main()
     
+
 ## 输出 / Output
     DataBase BT 0.0.0.2f
     (DEBUG) [2023-05-05 23:35:16]: DefaultDataBaseServer :: Init name=DefaultDataBaseServer path=.\DataBases\DefaultDataBaseServer\
