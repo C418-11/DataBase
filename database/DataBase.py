@@ -90,7 +90,8 @@ class DataBase(ABCDataBase):
             try:
                 self.stores.add(self.Store(store_path, self))
             except Exception as err:
-                self.log(msg=f"An error was raised while loading Store store_path={store_path} err={err}", level=WARNING)
+                self.log(msg=f"An error was raised while loading Store store_path={store_path} err={err}",
+                         level=WARNING)
 
     def create(self, __store_name: str):
         store_path = self.store_path(__store_name)
@@ -139,6 +140,7 @@ class DataBase(ABCDataBase):
         for st in self.stores:
             if st.name == item:
                 return st
+        raise LookupError("Store Not Find")
 
 
 class DataBaseServer(ABCServer):
@@ -221,7 +223,9 @@ class DataBaseServer(ABCServer):
             try:
                 return_code = EventToFunc(event, self, True)
             except Exception as err:
-                self.log(msg=f"{name}An error occurred while executing the event request! err_type={type(err)} err={err}", level=WARNING)
+                self.log(
+                    msg=f"{name}An error occurred while executing the event request! err_type={type(err)} err={err}",
+                    level=WARNING)
                 rollback_stack.pop()
                 if self.debug:
                     raise
@@ -230,7 +234,8 @@ class DataBaseServer(ABCServer):
             if return_code == EVENT_NOT_FIND:
                 self.log(msg=f"{name}An undefined event was requested! event={event}", level=INFO)
                 rollback_stack.pop()
-            elif not (isinstance(return_code, RunSuccess) or type(return_code) in (int, bool, str, list, bytes, tuple, dict, set)):
+            elif not (isinstance(return_code, RunSuccess) or type(return_code) in (
+                    int, bool, str, list, bytes, tuple, dict, set)):
                 self.log(msg=f"{name}Event request may fail to execute! return_code={return_code}", level=INFO)
 
             return return_code
@@ -259,7 +264,8 @@ class DataBaseServer(ABCServer):
                 ret = eval(line)
                 self.log(msg=f"A new line was executed from the stream ret_code={ret}", level=INFO)
             except Exception as err:
-                self.log(f"An error was thrown while running a line in the flow err_type={type(err)} err={err}", level=WARNING)
+                self.log(f"An error was thrown while running a line in the flow err_type={type(err)} err={err}",
+                         level=WARNING)
 
         self.log(msg="Exit File Input", level=DEBUG)
 
@@ -270,7 +276,7 @@ class DataBaseServer(ABCServer):
         conn.start_recv()
         conn.send(LOGIN.ASK_USER_AND_PASSWORD)
 
-        ret_login = LOGIN.ASK_USER_AND_PASSWORD_TIMEOUT
+        ret_login = LOGIN.LOGIN_FAILED
 
         try:
             login = conn.recv(5)
@@ -282,8 +288,16 @@ class DataBaseServer(ABCServer):
                 conn.close()
 
         except TimeoutError:
-            conn.send(LOGIN.ASK_USER_AND_PASSWORD_TIMEOUT)
-            self.log(msg=f"{name} Lost Connect! reason={LOGIN.ASK_USER_AND_PASSWORD_TIMEOUT}", level=WARNING)
+            ret_login = LOGIN.ASK_USER_AND_PASSWORD_TIMEOUT
+            conn.send(ret_login)
+            self.log(msg=f"{name} Lost Connect! reason={ret_login}", level=WARNING)
+        except Exception as err:
+            try:
+                conn.send(ret_login)
+            except OSError:
+                pass
+            self.log(
+                msg=f"{name} An unknown error was thrown during login! err_type={type(err)} err={err}", level=WARNING)
 
         event_runner = self._EventRunnerMaker(name=name)
 
@@ -331,7 +345,8 @@ class DataBaseServer(ABCServer):
             cont += 1
             thread_name = f"Serve-{cont}"
 
-            Thread(target=self._serve, kwargs={"conn": conn, "name": thread_name}, daemon=True, name=thread_name).start()
+            Thread(target=self._serve, kwargs={"conn": conn, "name": thread_name}, daemon=True,
+                   name=thread_name).start()
 
         self.log(msg=f"Exit RecvLoop", level=DEBUG)
 
@@ -395,16 +410,50 @@ class DataBaseServer(ABCServer):
         for db in self.DBs:
             if db.name == item:
                 return db
+        raise LookupError("DataBase Not Find")
+
+
+class DataBaseClient:
+    def __init__(self, __address: Address):
+        self.c_s = SocketIo(__address)
+        self.c_s.start_recv()
+
+    def recv(self, __timeout: Union[float, int] = float("inf")):
+        return self.c_s.recv(__timeout)
+
+    def close(self):
+        self.c_s.close()
+
+    def send_request(self, __event: Event, __timeout: Union[float, int] = float("inf")):
+        self.c_s.send(__event)
+        return self.recv(__timeout)
+
+    def send_list(self, __event_list: list[Event], __timeout: Union[float, int] = float("inf")) -> list:
+        ret_list = []
+        for event in __event_list:
+            try:
+                ret_list.append(self.send_request(event, __timeout))
+            except Exception as err:
+                ret_list.append(err)
+        return ret_list
+
+    def send_dict(self, __event_dict: dict[any, Event],
+                  __timeout: Union[float, int] = float("inf")) -> dict[any, Event]:
+        ret_dict = {}
+        for key, value in __event_dict.items():
+            try:
+                ret_dict[key] = self.send_request(value, __timeout)
+            except Exception as err:
+                ret_dict[key] = err
+        return ret_dict
 
 
 def mv_client():
-    c = SocketIo(Address("127.0.0.1", 12345))
-    c.start_recv()
-    print(c.recv(10))
+    client = DataBaseClient(Address("127.0.0.1", 12345))
 
     db_and_store = ("TestDB", "Store")
 
-    event_to_run = [
+    _event_list = [
         LOGIN.ACK_USER_AND_PASSWORD("default", "default"),
         DATABASE.INIT(db_and_store[0]),
         STORE.CREATE(*db_and_store),
@@ -417,27 +466,32 @@ def mv_client():
         STORE.DEL_LINE(*db_and_store, 0)
     ]
 
-    for event in event_to_run:
-        try:
-            c.send(event)
-            print(c.recv(10))
-        except Exception as err:
-            print(err)
+    _event_dict = {}
+    for event in _event_list:
+        _event_dict[object.__repr__(event)] = event
 
-    c.close()
+    print(client.recv(10))
+    ret_list = client.send_list(_event_list, 10)
+    for event in ret_list:
+        print(event)
+
+    ret_dict = client.send_dict(_event_dict, 10)
+    for k, v in ret_dict.items():
+        print(k, v)
+
+    client.close()
+
+    time.sleep(2)
 
 
 def main():
-    s = DataBaseServer(log_level=DEBUG, debug=True)  # ,
-    # log_file=open(PATH + "lasted.log", encoding='utf-8', mode='aw'))
+    s = DataBaseServer(log_level=DEBUG, debug=True)
 
     s.bind(("127.0.0.1", 12345))
     s.listen(1)
     s.start()
 
     mv_client()
-
-    # time.sleep(10000)
 
     s.stop()
     s.join()

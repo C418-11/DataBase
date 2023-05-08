@@ -6,6 +6,7 @@ from .ABC import GetUsers
 from .ABC import MKEvent
 from .ABC import RegEvent
 from .ABC import RunSuccess
+from .ABC import RunFailed
 from .USER import USER_NOT_FIND
 from .USER import WRONG_PASSWORD
 from database.ABC import ABCServer
@@ -17,6 +18,13 @@ class LoginSuccess(RunSuccess):
 
 
 LOGIN_SUCCESS = LoginSuccess()
+
+
+class LoginFailed(RunFailed):
+    raw = "LOGIN.LOGIN_FAILED"
+
+
+LOGIN_FAILED = LoginFailed()
 
 
 @RegEvent
@@ -54,4 +62,5 @@ ACK_USER_AND_PASSWORD = AckUserAndPassword
 ASK_USER_AND_PASSWORD = MKEvent("LOGIN.ASK_USER_AND_PASSWORD")
 ASK_USER_AND_PASSWORD_TIMEOUT = MKEvent("LOGIN.ASK_USER_AND_PASSWORD_TIMEOUT")
 
-__all__ = ("LOGIN_SUCCESS", "ACK_USER_AND_PASSWORD", "ASK_USER_AND_PASSWORD", "ASK_USER_AND_PASSWORD_TIMEOUT")
+__all__ = ("LOGIN_SUCCESS", "LoginFailed", "ACK_USER_AND_PASSWORD", "ASK_USER_AND_PASSWORD",
+           "ASK_USER_AND_PASSWORD_TIMEOUT")

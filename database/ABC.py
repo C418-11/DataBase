@@ -222,7 +222,7 @@ class ABCDataBase(ABC):
         return string.encode("utf-8", "unicode_escape").replace(b'\xc2', b'')
 
     def __getitem__(self, item) -> ABCStore:
-        ...
+        raise AttributeError
 
 
 class ABCServer(ABC):

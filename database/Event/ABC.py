@@ -119,6 +119,7 @@ __all__ = (
     "MKEvent",
     "RunSuccess",
     "RUN_SUCCESS",
+    "RunFailed",
     "RUN_FAILED",
     "WriteJson",
     "GetUsers",

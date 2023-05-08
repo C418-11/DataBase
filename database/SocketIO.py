@@ -61,7 +61,7 @@ class Recv:
 
             time.sleep(delay)
 
-            if delay != 1:
+            if delay < 3:
                 delay += 0.01
 
         raise TimeoutError("Timeout waiting for return value")
