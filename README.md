@@ -6,7 +6,7 @@
 
 Database implemented in pure Python
 
-##### 警告/ WARN
+##### 警告 / WARN
     此文件仅适配与0.0.0.3b版
     This file is only compatible with version 0.0.0.3b
     
