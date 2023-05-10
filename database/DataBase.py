@@ -3,6 +3,7 @@
 """
 May this file will help you to do st :D
 """
+import copy
 import pickle
 import socket
 import sys
@@ -22,9 +23,10 @@ from database.ABC import ABCStore
 from database.ABC import BuildPath
 from database.ABC import NameList
 from database.Event import *
+from database.Event.BaseEventType import SuccessEvent
+from database.Event.BaseEventType import FailedEvent
 from database.Event.ABC import EVENT_NOT_FIND
 from database.Event.ABC import Event
-from database.Event.ABC import RunSuccess
 from database.Event.ABC import RUN_FAILED
 from database.Event.ABC import EventToFunc
 from database.SocketIO import Address
@@ -57,6 +59,22 @@ class Store(ABCStore):
         self.data.append(line.ToDict())
         self.history("append", {"line": line.ToDict()})
         self.save()
+
+    def locate(self, keyword, value):
+        if type(keyword is str):
+            keyword = (keyword, )
+        for line in self.data:
+            for path in keyword[:-1]:
+                line = line[path]
+            if line[keyword[-1]] == value:
+                return self.format(line)
+        return copy.deepcopy(self.format)
+
+    def locates(self, keywords, values):
+        rets = []
+        for keyword, value in keywords, values:
+            rets.append(self.locate(keyword=keyword, value=value))
+        return tuple(rets)
 
 
 class DataBase(ABCDataBase):
@@ -234,7 +252,9 @@ class DataBaseServer(ABCServer):
             if return_code == EVENT_NOT_FIND:
                 self.log(msg=f"{name}An undefined event was requested! event={event}", level=INFO)
                 rollback_stack.pop()
-            elif not (isinstance(return_code, RunSuccess) or type(return_code) in (
+            elif isinstance(return_code, FailedEvent):
+                self.log(msg=f"{name}Event request execution failed! return_code={return_code}", level=INFO)
+            elif not (isinstance(return_code, SuccessEvent) or type(return_code) in (
                     int, bool, str, list, bytes, tuple, dict, set)):
                 self.log(msg=f"{name}Event request may fail to execute! return_code={return_code}", level=INFO)
 
@@ -463,6 +483,7 @@ def mv_client():
         STORE.GET_LINE(*db_and_store, 0),
         STORE.SET_LINE(*db_and_store, 0, NameList(a=11, b=22)),
         STORE.GET_LINE(*db_and_store, 0),
+        STORE.LOCATE_LINE(*db_and_store, "a", 11),
         STORE.DEL_LINE(*db_and_store, 0)
     ]
 

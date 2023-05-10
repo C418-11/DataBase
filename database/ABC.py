@@ -10,10 +10,11 @@ from typing import TextIO
 from typing import Type
 from typing import Union
 
+from database.Event.BaseEventType import SuccessEvent
 from database.SocketIO import SocketIo
 
 
-class NameList:
+class NameList(SuccessEvent):
     def __init__(self, *args, **kwargs):
         self._attributes = dict()
         for name in args:
@@ -26,6 +27,9 @@ class NameList:
         for attr in self._attributes:
             dict_[attr] = self.__getattribute__(attr)
         return dict_
+
+    def __call__(self, k_v: dict):
+        return type(self)(**k_v)
 
     def __setattr__(self, key, value):
         object.__setattr__(self, key, value)
@@ -111,6 +115,12 @@ class ABCStore(ABC):
         raise AttributeError
 
     def append(self, line: NameList):
+        raise AttributeError
+
+    def locate(self, keyword: Union[str, tuple[str]], value):
+        raise AttributeError
+
+    def locates(self, keywords: Union[tuple[tuple[str]], tuple[str]], values: tuple):
         raise AttributeError
 
     def set_history_format(self, format_: str = "[{time_}]({type_}): {value}"):

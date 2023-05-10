@@ -1,131 +1,173 @@
 # -*- coding: utf-8 -*-
+from typing import Union
 
 from .ABC import Event
 from .ABC import RegEvent
-from database.ABC import ABCServer
 from database.ABC import NameList
+from database.ABC import ABCStore
+from database.ABC import ABCDataBase
+from database.ABC import ABCServer
 
 
-@RegEvent
-class CreateStore(Event):
-    raw = "STORE.CREATE_STORE"
+class StoreEvent(Event):
 
     def __init__(self, database, store):
         self.database = database
         self.store = store
 
+    def db_obj(self, __server: ABCServer) -> ABCDataBase:
+        return __server[self.database]
+
+    def store_obj(self, __server: ABCServer) -> ABCStore:
+        db_obj = self.db_obj(__server)
+        return db_obj[self.store]
+
+
+@RegEvent
+class CreateStore(StoreEvent):
+    raw = "STORE.CREATE_STORE"
+
+    def __init__(self, database, store):
+        super().__init__(database, store)
+
     def func(self, server: ABCServer, **_kwargs):
-        db_obj = server[self.database]
-        db_obj.create(self.store)
+        self.db_obj(server).create(self.store)
 
 
 CREATE = CreateStore
 
 
 @RegEvent
-class SetStoreFormat(Event):
+class SetStoreFormat(StoreEvent):
     raw = "STORE.SET_STORE_FORMAT"
 
     def __init__(self, database, store, format_: NameList):
-        self.database = database
-        self.store = store
+        super().__init__(database, store)
         self.format_ = format_
 
     def func(self, server: ABCServer, **_kwargs):
-        db_obj = server[self.database]
-        db_obj[self.store].set_format(self.format_)
+        self.store_obj(server).set_format(self.format_)
 
 
 SET_FORMAT = SetStoreFormat
 
 
 @RegEvent
-class SetHistoryFormat(Event):
+class SetHistoryFormat(StoreEvent):
     raw = "STORE.SET_HISTORY_FORMAT"
 
     def __init__(self, database, store, format_: str):
-        self.database = database
-        self.store = store
+        super().__init__(database, store)
         self.format_ = format_
 
     def func(self, server: ABCServer, **_kwargs):
-        db_obj = server[self.database]
-        db_obj[self.store].set_history_format(self.format_)
+        self.store_obj(server).set_history_format(self.format_)
 
 
 SET_HISTORY_FORMANT = SetHistoryFormat
 
 
 @RegEvent
-class Append(Event):
+class Append(StoreEvent):
     raw = "STORE.APPEND"
 
     def __init__(self, database, store, line: NameList):
-        self.database = database
-        self.store = store
+        super().__init__(database, store)
         self.line = line
 
     def func(self, server: ABCServer, **_kwargs):
-        db_obj = server[self.database]
-        store_obj = db_obj[self.store]
-        store_obj.append(self.line)
+        self.store_obj(server).append(self.line)
 
 
 APPEND = Append
 
 
 @RegEvent
-class GetLine(Event):
+class GetLine(StoreEvent):
     raw = "STORE.GET_LINE"
 
     def __init__(self, database, store, index):
-        self.database = database
-        self.store = store
+        super().__init__(database, store)
         self.index = index
 
     def func(self, server: ABCServer, **_kwargs):
-        db_obj = server[self.database]
-        store_obj = db_obj[self.store]
-        return store_obj[self.index]
+        return self.store_obj(server)[self.index]
 
 
 GET_LINE = GetLine
 
 
 @RegEvent
-class SetLine(Event):
+class SetLine(StoreEvent):
     raw = "STORE.SET_LINE"
 
     def __init__(self, database, store, index: int, line: NameList):
-        self.database = database
-        self.store = store
+        super().__init__(database, store)
         self.index = index
         self.line = line
 
     def func(self, server: ABCServer, **_kwargs):
-        db_obj = server[self.database]
-        store_obj = db_obj[self.store]
-        store_obj[self.index] = self.line.ToDict()
+        self.store_obj(server)[self.index] = self.line.ToDict()
 
 
 SET_LINE = SetLine
 
 
 @RegEvent
-class DelLine(Event):
+class DelLine(StoreEvent):
     raw = "STORE.DEL_LINE"
 
     def __init__(self, database, store, index: int):
-        self.database = database
-        self.store = store
+        super().__init__(database, store)
         self.index = index
 
     def func(self, server: ABCServer, **_kwargs):
-        db_obj = server[self.database]
-        store_obj = db_obj[self.store]
-        del store_obj[self.index]
+        del self.store_obj(server)[self.index]
 
 
 DEL_LINE = DelLine
 
-__all__ = ("CREATE", "SET_FORMAT", "SET_HISTORY_FORMANT", "APPEND", "GET_LINE", "SET_LINE", "DEL_LINE")
+
+@RegEvent
+class LocateLine(StoreEvent):
+    raw = "STORE.LOCATE_LINE"
+
+    def __init__(self, database, store, keyword: Union[str, tuple[str]], value):
+        super().__init__(database, store)
+        self.keyword = keyword
+        self.value = value
+
+    def func(self, server: ABCServer, **_kwargs):
+        return self.store_obj(server).locate(self.keyword, self.value)
+
+
+LOCATE_LINE = LocateLine
+
+
+@RegEvent
+class LocateLines(StoreEvent):
+    raw = "STORE.LOCATE_LINES"
+
+    def __init__(self, database, store, keywords: Union[tuple[tuple[str]], tuple[str]], values: tuple):
+        super().__init__(database, store)
+        self.keywords = keywords
+        self.values = values
+
+    def func(self, server: ABCServer, **_kwargs):
+        return self.store_obj(server).locates(self.keywords, self.values)
+
+
+LOCATE_LINES = LocateLines
+
+
+__all__ = (
+    "CREATE",
+    "SET_FORMAT",
+    "SET_HISTORY_FORMANT",
+    "APPEND",
+    "GET_LINE",
+    "SET_LINE",
+    "DEL_LINE",
+    "LOCATE_LINE",
+    "LOCATE_LINES"
+)

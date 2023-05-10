@@ -4,10 +4,13 @@ import json
 from abc import ABC
 from typing import Union
 
+from .BaseEventType import ABCEvent
+from .BaseEventType import SuccessEvent
+from .BaseEventType import  FailedEvent
 from database.ABC import ABCServer
 
 
-class Event(ABC):
+class Event(ABCEvent):
     raw: str
 
     def __str__(self) -> str:
@@ -48,7 +51,7 @@ def MKEvent(name: str) -> Event:
     return event
 
 
-class RunSuccess(Event):
+class RunSuccess(Event, SuccessEvent):
     raw = "EVENT.RUN_SUCCESS"
 
     def __eq__(self, other):
@@ -58,7 +61,7 @@ class RunSuccess(Event):
 RUN_SUCCESS = RunSuccess()
 
 
-class RunFailed(Event):
+class RunFailed(Event, FailedEvent):
     raw = "EVENT.RUN_FAILED"
 
     def __eq__(self, other):
