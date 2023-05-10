@@ -6,6 +6,17 @@
 
 Database implemented in pure Python
 
+##### 警告/ WARN
+    此文件仅适配与0.0.0.3b版
+    This file is only compatible with version 0.0.0.3b
+    
+    已落后于已上传版本
+    Has fallen behind the uploaded version
+    
+    请以源代码为准
+    Please refer to the source code for accuracy
+    
+
 ### 示例 / Example
     from database.DataBase import main
     
