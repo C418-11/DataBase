@@ -12,6 +12,14 @@ from typing import Union
 
 from database.Event.BaseEventType import SuccessEvent
 from database.SocketIO import SocketIo
+from functools import wraps
+
+
+def DefineBySubClass(func):
+    @wraps(func)
+    def f(*__args, **__kwargs):
+        raise AttributeError("This method is defined by subclasses")
+    return f
 
 
 class NameList(SuccessEvent):
@@ -48,7 +56,7 @@ class NameList(SuccessEvent):
         k_v = ""
         for attr in self._attributes:
             k_v += f"{attr}={self.__getattribute__(attr)} "
-        return f"NameList({k_v[:-1]})"
+        return f"{type(self).__name__}({k_v[:-1]})"
 
     def __repr__(self):
         return str(self)
@@ -86,7 +94,7 @@ class ABCStore(ABC):
         if format_ is not None:
             self.format = pickle.loads(database.StringToPickleBytes(format_))
 
-    def reload(self):
+    def reload(self) -> None:
         BuildPath(path=self.path)
 
         self.info = self.database.BinJsonReader(self.path + self.database.INFO_FILE)
@@ -102,54 +110,54 @@ class ABCStore(ABC):
         if format_ is not None:
             self.format = pickle.loads(self.database.StringToPickleBytes(format_))
 
-    def save(self):
+    def save(self) -> None:
         self.database.BinJsonWriter(self.path + self.database.DATA_FILE, self.data)
         self.database.BinJsonWriter(self.path + self.database.HISTORY_FILE, self.histories)
 
-    def history(self, type_, value):
+    def history(self, type_, value) -> None:
         time_ = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
         history = self.history_format.format(time_=time_, type_=type_, value=value)
         self.histories.append(history)
 
-    def set_format(self, format_: NameList):
-        raise AttributeError
+    @DefineBySubClass
+    def set_format(self, format_: NameList) -> None: ...
 
-    def append(self, line: NameList):
-        raise AttributeError
+    @DefineBySubClass
+    def append(self, line: NameList) -> None: ...
 
-    def locate(self, keyword: Union[str, tuple[str]], value):
-        raise AttributeError
+    @DefineBySubClass
+    def search(self, keyword: Union[str, tuple[str]], value) -> NameList: ...
 
-    def locates(self, keywords: Union[tuple[tuple[str]], tuple[str]], values: tuple):
-        raise AttributeError
+    @DefineBySubClass
+    def locate(self, line: NameList) -> int: ...
 
-    def set_history_format(self, format_: str = "[{time_}]({type_}): {value}"):
+    def set_history_format(self, format_: str = "[{time_}]({type_}): {value}") -> None:
         self.database.BinJsonChanger(self.path + self.database.INFO_FILE, ("history_format",), format_)
         self.history_format = format_
         self.info["history_format"] = format_
         self.history("set_history_format", {"format": format_})
 
-    def __setitem__(self, key: int, value: dict):
+    def __setitem__(self, key: int, value: dict) -> None:
         self.data[key] = value
         self.history("set_line", {"index": key, "value": value})
         self.save()
 
-    def __getitem__(self, item: int):
+    def __getitem__(self, item: int) -> dict:
         return self.data[item]
 
-    def __delitem__(self, key):
+    def __delitem__(self, key) -> None:
         last_value = self.data[key]
         self.history("del_start", {"index": key, "last_value": last_value})
         self.data.__delitem__(key)
         self.history("del_finish", {"index": key, "last_value": last_value})
         self.save()
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if not isinstance(other, ABCStore):
             return False
         return self._id == other._id
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self._id)
 
 
@@ -162,7 +170,7 @@ class ABCDataBase(ABC):
     name: str
     path: str
     stores: set[ABCStore]
-    Store: Type[ABCStore]
+    store: dict[str, Type[ABCStore]]
 
     def __init__(self, __name: str, __path: str) -> None:
         self.name = __name
@@ -183,11 +191,11 @@ class ABCDataBase(ABC):
                 pass
         return paths
 
-    def create(self, __store_name: str) -> None:
-        raise AttributeError
+    @DefineBySubClass
+    def create(self, __store, __store_name: str) -> None: ...
 
-    def log(self, msg: str, operator: str) -> None:
-        raise AttributeError
+    @DefineBySubClass
+    def log(self, msg: str, operator: str) -> None: ...
 
     @staticmethod
     def BinJsonReader(__file_path: str):
@@ -231,8 +239,8 @@ class ABCDataBase(ABC):
     def StringToPickleBytes(string: str):
         return string.encode("utf-8", "unicode_escape").replace(b'\xc2', b'')
 
-    def __getitem__(self, item) -> ABCStore:
-        raise AttributeError
+    @DefineBySubClass
+    def __getitem__(self, item) -> ABCStore: ...
 
 
 class ABCServer(ABC):
@@ -240,16 +248,18 @@ class ABCServer(ABC):
     path: str
     file: Union[TextIO, BinaryIO]
 
-    database: Type[ABCDataBase]
+    databases: dict[str, Type[ABCDataBase]]
     DBs: set[ABCDataBase]
 
     USERDATA_FILE: str = "Users.json"
 
+    @DefineBySubClass
     def _file_input_loop(self) -> None:
         """
         运行时逐行读取并执行流
         """
 
+    @DefineBySubClass
     def _serve(self, conn: SocketIo, name: str) -> None:
         """
         对客户端的服务方法 (在线程中)
@@ -257,11 +267,13 @@ class ABCServer(ABC):
         :param name: 线程名称
         """
 
+    @DefineBySubClass
     def _recv_loop(self) -> None:
         """
         接受客户端套接字连接请求的循环 (在线程中)
         """
 
+    @DefineBySubClass
     def log(self, msg: str, level: int) -> None:
         """
         以指定格式输出日志
@@ -269,50 +281,58 @@ class ABCServer(ABC):
         :param level: 日志等级
         """
 
+    @DefineBySubClass
     def _start_thread(self) -> None:
         """
         用于启动线程
         """
 
+    @DefineBySubClass
     def start(self) -> None:
         """
         启动数据库服务器
         """
 
+    @DefineBySubClass
     def stop(self) -> None:
         """
         停止数据库服务器
         """
 
+    @DefineBySubClass
     def restart(self) -> None:
         """
         重启数据库服务器
         """
 
+    @DefineBySubClass
     def join(self, timeout=None) -> None:
         """
         等待服务器完全关闭
         :param timeout: 超时时间
         """
 
+    @DefineBySubClass
     def bind(self, __address: Union[tuple[any, ...], str, bytes]) -> None:
         """
         绑定数据库服务器
         :param __address: 绑定到的ip及端口
         """
 
+    @DefineBySubClass
     def listen(self, __backlog: int) -> None:
         """
         :param __backlog: 最大连接等待数
         """
 
+    @DefineBySubClass
     def is_alive(self) -> bool:
         """
         检查服务器是否开启
         """
 
-    def __getitem__(self, item) -> ABCDataBase:
-        raise AttributeError
+    @DefineBySubClass
+    def __getitem__(self, item) -> ABCDataBase: ...
 
 
 def BuildPath(path: str):

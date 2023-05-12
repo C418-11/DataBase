@@ -3,6 +3,7 @@ from typing import Union
 
 from .ABC import Event
 from .ABC import RegEvent
+from .ABC import RunFailed
 from database.ABC import NameList
 from database.ABC import ABCStore
 from database.ABC import ABCDataBase
@@ -27,11 +28,12 @@ class StoreEvent(Event):
 class CreateStore(StoreEvent):
     raw = "STORE.CREATE_STORE"
 
-    def __init__(self, database, store):
+    def __init__(self, database, store, name):
         super().__init__(database, store)
+        self.name = name
 
     def func(self, server: ABCServer, **_kwargs):
-        self.db_obj(server).create(self.store)
+        self.db_obj(server).create(self.store, self.name)
 
 
 CREATE = CreateStore
@@ -132,32 +134,38 @@ DEL_LINE = DelLine
 class LocateLine(StoreEvent):
     raw = "STORE.LOCATE_LINE"
 
+    def __init__(self, database, store, line: NameList):
+        super().__init__(database, store)
+        self.line = line
+
+    def func(self, server: ABCServer, **_kwargs):
+        return self.store_obj(server).locate(self.line)
+
+
+LOCATE = LocateLine
+
+
+@RegEvent
+class SearchLine(StoreEvent):
+    raw = "STORE.SEARCH_LINE"
+
     def __init__(self, database, store, keyword: Union[str, tuple[str]], value):
         super().__init__(database, store)
         self.keyword = keyword
         self.value = value
 
     def func(self, server: ABCServer, **_kwargs):
-        return self.store_obj(server).locate(self.keyword, self.value)
+        return self.store_obj(server).search(self.keyword, self.value)
 
 
-LOCATE_LINE = LocateLine
+SEARCH = SearchLine
 
 
-@RegEvent
-class LocateLines(StoreEvent):
-    raw = "STORE.LOCATE_LINES"
-
-    def __init__(self, database, store, keywords: Union[tuple[tuple[str]], tuple[str]], values: tuple):
-        super().__init__(database, store)
-        self.keywords = keywords
-        self.values = values
-
-    def func(self, server: ABCServer, **_kwargs):
-        return self.store_obj(server).locates(self.keywords, self.values)
+class LineNotFind(RunFailed):
+    raw = "STORE.LINE_NOT_FIND"
 
 
-LOCATE_LINES = LocateLines
+LINE_NOT_FIND = LineNotFind()
 
 
 __all__ = (
@@ -168,6 +176,7 @@ __all__ = (
     "GET_LINE",
     "SET_LINE",
     "DEL_LINE",
-    "LOCATE_LINE",
-    "LOCATE_LINES"
+    "LOCATE",
+    "SEARCH",
+    "LINE_NOT_FIND"
 )

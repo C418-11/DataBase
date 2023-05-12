@@ -60,7 +60,7 @@ class Store(ABCStore):
         self.history("append", {"line": line.ToDict()})
         self.save()
 
-    def locate(self, keyword, value):
+    def search(self, keyword, value):
         if type(keyword is str):
             keyword = (keyword, )
         for line in self.data:
@@ -70,11 +70,11 @@ class Store(ABCStore):
                 return self.format(line)
         return copy.deepcopy(self.format)
 
-    def locates(self, keywords, values):
-        rets = []
-        for keyword, value in keywords, values:
-            rets.append(self.locate(keyword=keyword, value=value))
-        return tuple(rets)
+    def locate(self, line):
+        try:
+            return self.data.index(line.ToDict())
+        except ValueError:
+            return STORE.LINE_NOT_FIND
 
 
 class DataBase(ABCDataBase):
@@ -101,17 +101,18 @@ class DataBase(ABCDataBase):
         self.logging = logging.Logger(name=self.name, stream=open(self.log_path, f"{log_mode}b"))
         self.logging.type = bytes
         self.logging: logging.Logger
-        self.Store = Store
+        self.store = {"default": Store}
 
         self.stores = set()
         for store_path in self._DBPathFinder():
             try:
-                self.stores.add(self.Store(store_path, self))
+                cls = pickle.loads(self.StringToPickleBytes(self.BinJsonReader(store_path + self.INFO_FILE)["cls"]))
+                self.stores.add(cls(store_path, self))
             except Exception as err:
                 self.log(msg=f"An error was raised while loading Store store_path={store_path} err={err}",
                          level=WARNING)
 
-    def create(self, __store_name: str):
+    def create(self, __store, __store_name):
         store_path = self.store_path(__store_name)
 
         id_ = time.time()
@@ -126,10 +127,13 @@ class DataBase(ABCDataBase):
 
         BuildPath(path=store_path)
 
+        cls = self.store[__store]
+
         self.BinJsonWriter(
             store_path + self.INFO_FILE,
             {
                 "id": str(id_),
+                "cls": self.PickleBytesToString(pickle.dumps(cls)),
                 "name": __store_name,
                 "format": None,
                 "history_format": "[{time_}]({type_}): {value}"
@@ -144,7 +148,7 @@ class DataBase(ABCDataBase):
             []
         )
 
-        self.stores.add(self.Store(store_path, self))
+        self.stores.add(cls(store_path, self))
 
     def log(self, msg: str, level, store: str = "SYSTEM"):
         time_ = time.strftime(self.time_format, time.localtime())
@@ -171,7 +175,7 @@ class DataBaseServer(ABCServer):
                  path: str = PATH,
                  init_socket: tuple = None,
                  file: BinaryIO = sys.stdin,
-                 database: Type[ABCDataBase] = DataBase,
+                 databases: dict[str, Type[ABCDataBase]] = None,
                  *,
                  debug: bool = False,
                  time_format: str = "%Y-%m-%d %H:%M:%S",
@@ -184,7 +188,7 @@ class DataBaseServer(ABCServer):
         :param path: 数据库位置文件夹
         :param init_socket: 数据库的网络套接字初始化参数
         :param file: 运行时需逐行读取并执行的流
-        :param database: 指定数据库类型
+        :param databases: 指定数据库类型
 
         :param debug: 是否开启调试模式
         :param time_format: 时间格式化模板
@@ -197,7 +201,9 @@ class DataBaseServer(ABCServer):
         self.name = name
         self.path = path + name + "\\"
         self.file = file
-        self.database = database
+        if databases is None:
+            databases = {"default": DataBase}
+        self.databases = databases
 
         self.debug = debug
 
@@ -468,6 +474,9 @@ class DataBaseClient:
         return ret_dict
 
 
+__all__ = ("PATH", "Store", "DataBase", "DataBaseServer", "DataBaseClient")
+
+
 def mv_client():
     client = DataBaseClient(Address("127.0.0.1", 12345))
 
@@ -475,16 +484,18 @@ def mv_client():
 
     _event_list = [
         LOGIN.ACK_USER_AND_PASSWORD("default", "default"),
-        DATABASE.INIT(db_and_store[0]),
-        STORE.CREATE(*db_and_store),
+        DATABASE.INIT("default", db_and_store[0]),
+        STORE.CREATE(db_and_store[0], "default", db_and_store[1]),
         STORE.SET_FORMAT(*db_and_store, NameList("a", "b")),
         STORE.SET_HISTORY_FORMANT(*db_and_store, "[{time_}]({type_}): {value}"),
         STORE.APPEND(*db_and_store, NameList(a=1, b=2)),
         STORE.GET_LINE(*db_and_store, 0),
         STORE.SET_LINE(*db_and_store, 0, NameList(a=11, b=22)),
         STORE.GET_LINE(*db_and_store, 0),
-        STORE.LOCATE_LINE(*db_and_store, "a", 11),
-        STORE.DEL_LINE(*db_and_store, 0)
+        STORE.SEARCH(*db_and_store, "a", 11),
+        STORE.LOCATE(*db_and_store, NameList(a=11, b=22)),
+        STORE.DEL_LINE(*db_and_store, 0),
+        STORE.LOCATE(*db_and_store, NameList(a=11, b=22))
     ]
 
     _event_dict = {}
