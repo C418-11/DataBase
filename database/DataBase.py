@@ -11,7 +11,6 @@ import threading
 import time
 from collections import deque
 from threading import Thread
-from typing import BinaryIO
 from typing import Type
 from typing import TextIO
 from typing import Union
@@ -56,6 +55,8 @@ class Store(ABCStore):
         self.reload()
 
     def append(self, line: NameList):
+        if line in self.data:
+            raise ValueError("Line already exists!")
         self.data.append(line.ToDict())
         self.history("append", {"line": line.ToDict()})
         self.save()
@@ -63,12 +64,15 @@ class Store(ABCStore):
     def search(self, keyword, value):
         if type(keyword is str):
             keyword = (keyword, )
+        ret = []
         for line in self.data:
             for path in keyword[:-1]:
                 line = line[path]
             if line[keyword[-1]] == value:
-                return self.format(line)
-        return copy.deepcopy(self.format)
+                ret.append(self.format(line))
+        if ret:
+            return ret
+        return [copy.deepcopy(self.format)]
 
     def locate(self, line):
         try:
@@ -174,7 +178,7 @@ class DataBaseServer(ABCServer):
                  name: str = "DefaultDataBaseServer",
                  path: str = PATH,
                  init_socket: tuple = None,
-                 file: BinaryIO = sys.stdin,
+                 file: TextIO = sys.stdin,
                  databases: dict[str, Type[ABCDataBase]] = None,
                  *,
                  debug: bool = False,
@@ -360,7 +364,7 @@ class DataBaseServer(ABCServer):
         while self.running:
             try:
                 c_socket = self.server.get(10)[0]
-                c_socket: SOCKET.socket
+                c_socket: socket.socket
             except TimeoutError:
                 continue
             except threading.ThreadError:

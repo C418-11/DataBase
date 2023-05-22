@@ -125,6 +125,9 @@ class Logger:
 
         self.stream.write(msg)
 
+    def close(self):
+        self.stream.close()
+
 
 def main():
     pass

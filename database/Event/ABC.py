@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 
 import json
-from abc import ABC
 from typing import Union
 
 from .BaseEventType import ABCEvent
 from .BaseEventType import SuccessEvent
-from .BaseEventType import  FailedEvent
+from .BaseEventType import FailedEvent
 from database.ABC import ABCServer
 
 
@@ -108,6 +107,8 @@ def EventToFunc(event: Event, server: ABCServer = None, run: bool = False, **kwa
     try:
         func = __EventToFunc[event.raw]
     except KeyError:
+        return EVENT_NOT_FIND
+    except AttributeError:
         return EVENT_NOT_FIND
     if run:
         ret = func(self=event, server=server, **kwargs)
