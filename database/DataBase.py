@@ -68,8 +68,11 @@ class Store(ABCStore):
         for line in self.data:
             for path in keyword[:-1]:
                 line = line[path]
-            if line[keyword[-1]] == value:
-                ret.append(self.format(line))
+            try:
+                if line[keyword[-1]] == value:
+                    ret.append(self.format(line))
+            except KeyError:
+                return STORE.KEY_NOT_FIND
         if ret:
             return ret
         return [copy.deepcopy(self.format)]

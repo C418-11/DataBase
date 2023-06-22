@@ -161,6 +161,13 @@ class SearchLine(StoreEvent):
 SEARCH = SearchLine
 
 
+class KeyNotFind(RunFailed):
+    raw = "STORE.KET_NOT_FIND"
+
+
+KEY_NOT_FIND = KeyNotFind()
+
+
 class LineNotFind(RunFailed):
     raw = "STORE.LINE_NOT_FIND"
 
@@ -178,5 +185,6 @@ __all__ = (
     "DEL_LINE",
     "LOCATE",
     "SEARCH",
+    "KEY_NOT_FIND",
     "LINE_NOT_FIND"
 )
